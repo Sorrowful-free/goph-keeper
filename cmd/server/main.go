@@ -30,10 +30,10 @@ func main() {
 
 	// Infrastructure: storage (БД)
 	st, err := storage.NewStorage(cfg.DSN, cfg.DBType)
+	defer st.Close()
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
-	defer st.Close()
 
 	// Миграции (go-migrate)
 	if err := migrations.RunUp(st.GetDB(), cfg.DSN, cfg.DBType); err != nil {

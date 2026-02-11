@@ -3,6 +3,8 @@ package tui
 import (
 	"encoding/json"
 	"fmt"
+	"iter"
+	"slices"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -59,9 +61,7 @@ func (m *ViewDataModel) View() string {
 
 	if len(data.Metadata) > 0 {
 		view = append(view, "Метаданные:")
-		for _, md := range data.Metadata {
-			view = append(view, fmt.Sprintf("  %s: %s", md.Key, md.Value))
-		}
+		view = append(view, slices.Collect(metadataLinesSeq(data.Metadata))...)
 		view = append(view, "")
 	}
 
@@ -78,6 +78,20 @@ func (m *ViewDataModel) View() string {
 	view = append(view, "Esc для возврата, d для удаления")
 
 	return menuStyle.Render(lipgloss.JoinVertical(lipgloss.Left, view...))
+}
+
+// metadataLinesSeq возвращает итератор строк "  key: value" по метаданным
+func metadataLinesSeq(metadata []*proto.Metadata) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for _, md := range metadata {
+			if md == nil {
+				continue
+			}
+			if !yield(fmt.Sprintf("  %s: %s", md.Key, md.Value)) {
+				return
+			}
+		}
+	}
 }
 
 // formatDataContent декодирует EncryptedData и возвращает читаемый текст по типу записи

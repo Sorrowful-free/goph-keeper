@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"iter"
+	"slices"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -92,23 +94,31 @@ func (m *ListDataModel) View() string {
 		return "Нет данных\n\nНажмите Esc для возврата"
 	}
 
-	var items []string
-	items = append(items, titleStyle.Render("Список данных"))
-	items = append(items, "")
+	items := []string{
+		titleStyle.Render("Список данных"),
+		"",
+	}
+	items = append(items, slices.Collect(listDataToLinesSeq(m.dataList, m.selected))...)
+	items = append(items, "", "↑↓ для навигации, Enter для просмотра, r для обновления, Esc для возврата")
+	return menuStyle.Render(lipgloss.JoinVertical(lipgloss.Left, items...))
+}
 
-	for i, data := range m.dataList {
-		item := fmt.Sprintf("%s [%s]", data.Name, getDataTypeName(data.Type))
-		if i == m.selected {
-			items = append(items, selectedMenuItemStyle.Render("▶ "+item))
-		} else {
-			items = append(items, menuItemStyle.Render("  "+item))
+// listDataToLinesSeq возвращает итератор строк списка данных (имя [тип], выбранный/обычный стиль)
+func listDataToLinesSeq(dataList []*proto.Data, selected int) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for i, d := range dataList {
+			item := fmt.Sprintf("%s [%s]", d.Name, getDataTypeName(d.Type))
+			var line string
+			if i == selected {
+				line = selectedMenuItemStyle.Render("▶ " + item)
+			} else {
+				line = menuItemStyle.Render("  " + item)
+			}
+			if !yield(line) {
+				return
+			}
 		}
 	}
-
-	items = append(items, "")
-	items = append(items, "↑↓ для навигации, Enter для просмотра, r для обновления, Esc для возврата")
-
-	return menuStyle.Render(lipgloss.JoinVertical(lipgloss.Left, items...))
 }
 
 func getDataTypeName(dt proto.DataType) string {

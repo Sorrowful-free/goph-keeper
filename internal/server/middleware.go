@@ -12,6 +12,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type contextKey string
+
+const userIDContextKey contextKey = "user_id"
+
 // LoggingInterceptor логирует каждый входящий gRPC-запрос: метод, длительность и результат.
 func LoggingInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	start := time.Now()
@@ -32,7 +36,7 @@ func LoggingInterceptor(ctx context.Context, req interface{}, info *grpc.UnarySe
 	return resp, nil
 }
 
-// AuthInterceptor перехватывает запросы и проверяет JWT токен
+// AuthInterceptor перехватывает запросы, проверяет JWT и кладёт userID в контекст.
 func AuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	// Пропускаем аутентификацию для методов AuthService
 	if info.FullMethod == "/gophkeeper.AuthService/Register" ||
@@ -41,7 +45,7 @@ func AuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServe
 		return handler(ctx, req)
 	}
 
-	// Для остальных методов проверяем токен
+	// Для остальных методов проверяем токен и извлекаем userID
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "no metadata")
@@ -57,10 +61,25 @@ func AuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServe
 		token = token[7:]
 	}
 
-	_, err := crypto.ValidateToken(token)
+	claims, err := crypto.ValidateToken(token)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid token")
 	}
 
+	ctx = context.WithValue(ctx, userIDContextKey, claims.UserID)
 	return handler(ctx, req)
+}
+
+// GetUserIDFromContext возвращает user ID, записанный в контекст AuthInterceptor.
+// Используется в обработчиках (например, DataService) для получения текущего пользователя.
+func GetUserIDFromContext(ctx context.Context) (string, error) {
+	v := ctx.Value(userIDContextKey)
+	if v == nil {
+		return "", status.Error(codes.Unauthenticated, "no user in context")
+	}
+	userID, ok := v.(string)
+	if !ok {
+		return "", status.Error(codes.Internal, "invalid user id in context")
+	}
+	return userID, nil
 }

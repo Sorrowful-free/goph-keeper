@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"iter"
+	"slices"
+
 	"encoding/json"
 	"fmt"
 	"time"
@@ -374,13 +377,7 @@ func (m *AddDataModel) View() string {
 		}
 		view = append(view, "")
 		view = append(view, "Тип данных:")
-		for i, t := range m.types {
-			if m.focused == 1 && i == m.typeSelect {
-				view = append(view, selectedMenuItemStyle.Render("▶ "+t))
-			} else {
-				view = append(view, menuItemStyle.Render("  "+t))
-			}
-		}
+		view = append(view, slices.Collect(addDataTypesToLinesSeq(m.types, m.typeSelect, m.focused == 1))...)
 		view = append(view, "")
 		view = append(view, "Tab/↓ — следующий, Enter — далее или сохранить, Esc — назад/отмена")
 	} else {
@@ -451,4 +448,21 @@ func (m *AddDataModel) View() string {
 	view = append(view, "")
 
 	return menuStyle.Render(lipgloss.JoinVertical(lipgloss.Left, view...))
+}
+
+// addDataTypesToLinesSeq возвращает итератор строк списка типов (выбранный/обычный стиль)
+func addDataTypesToLinesSeq(types []string, typeSelect int, typeFocused bool) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for i, t := range types {
+			var line string
+			if typeFocused && i == typeSelect {
+				line = selectedMenuItemStyle.Render("▶ " + t)
+			} else {
+				line = menuItemStyle.Render("  " + t)
+			}
+			if !yield(line) {
+				return
+			}
+		}
+	}
 }

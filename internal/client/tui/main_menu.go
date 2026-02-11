@@ -1,7 +1,8 @@
 package tui
 
 import (
-	"fmt"
+	"iter"
+	"slices"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -95,20 +96,28 @@ func (m *MainMenuModel) handleSelection() (tea.Model, tea.Cmd) {
 }
 
 func (m *MainMenuModel) View() string {
-	var items []string
-	items = append(items, titleStyle.Render("GophKeeper - Главное меню"))
-	items = append(items, "")
+	items := []string{
+		titleStyle.Render("GophKeeper - Главное меню"),
+		"",
+	}
+	items = append(items, slices.Collect(menuItemsToLinesSeq(m.menuItems, m.selected))...)
+	items = append(items, "", "Используйте ↑↓ для навигации, Enter для выбора, q для выхода")
+	return menuStyle.Render(lipgloss.JoinVertical(lipgloss.Left, items...))
+}
 
-	for i, item := range m.menuItems {
-		if i == m.selected {
-			items = append(items, selectedMenuItemStyle.Render("▶ "+item))
-		} else {
-			items = append(items, menuItemStyle.Render("  "+item))
+// menuItemsToLinesSeq возвращает итератор строк меню (выбранный/обычный стиль)
+func menuItemsToLinesSeq(menuItems []string, selected int) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for i, item := range menuItems {
+			var line string
+			if i == selected {
+				line = selectedMenuItemStyle.Render("▶ " + item)
+			} else {
+				line = menuItemStyle.Render("  " + item)
+			}
+			if !yield(line) {
+				return
+			}
 		}
 	}
-
-	items = append(items, "")
-	items = append(items, fmt.Sprintf("Используйте ↑↓ для навигации, Enter для выбора, q для выхода"))
-
-	return menuStyle.Render(lipgloss.JoinVertical(lipgloss.Left, items...))
 }

@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
+	"slices"
 	"time"
 
-	"github.com/gophkeeper/gophkeeper/internal/crypto"
 	"github.com/gophkeeper/gophkeeper/internal/models"
 	"github.com/gophkeeper/gophkeeper/internal/usecase/data"
 	"github.com/gophkeeper/gophkeeper/proto"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -27,31 +27,6 @@ func NewDataService(dataUC *data.DataUseCase) *DataService {
 	return &DataService{
 		dataUC: dataUC,
 	}
-}
-
-// getUserIDFromContext извлекает user ID из контекста (из JWT токена)
-func (s *DataService) getUserIDFromContext(ctx context.Context) (string, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return "", status.Error(codes.Unauthenticated, "no metadata")
-	}
-
-	tokens := md.Get("authorization")
-	if len(tokens) == 0 {
-		return "", status.Error(codes.Unauthenticated, "no authorization token")
-	}
-
-	token := tokens[0]
-	if len(token) > 7 && token[:7] == "Bearer " {
-		token = token[7:]
-	}
-
-	claims, err := crypto.ValidateToken(token)
-	if err != nil {
-		return "", status.Error(codes.Unauthenticated, "invalid token")
-	}
-
-	return claims.UserID, nil
 }
 
 // convertProtoDataType конвертирует proto DataType в models.DataType
@@ -130,12 +105,7 @@ func convertModelDataToProto(modelData *models.Data) (*proto.Data, error) {
 	if modelData.Metadata != "" && modelData.Metadata != "{}" {
 		var metadataList []models.MetadataItem
 		if err := json.Unmarshal([]byte(modelData.Metadata), &metadataList); err == nil {
-			for _, item := range metadataList {
-				metadataItems = append(metadataItems, &proto.Metadata{
-					Key:   item.Key,
-					Value: item.Value,
-				})
-			}
+			metadataItems = slices.Collect(metadataToProtoSeq(metadataList))
 		}
 	}
 
@@ -151,9 +121,35 @@ func convertModelDataToProto(modelData *models.Data) (*proto.Data, error) {
 	}, nil
 }
 
+// metadataToProtoSeq возвращает итератор по []models.MetadataItem → *proto.Metadata
+func metadataToProtoSeq(metadataList []models.MetadataItem) iter.Seq[*proto.Metadata] {
+	return func(yield func(*proto.Metadata) bool) {
+		for _, item := range metadataList {
+			if !yield(&proto.Metadata{Key: item.Key, Value: item.Value}) {
+				return
+			}
+		}
+	}
+}
+
+// modelDataSliceToProtoSeq возвращает итератор по []*models.Data → *proto.Data (только успешные конвертации)
+func modelDataSliceToProtoSeq(items []*models.Data) iter.Seq[*proto.Data] {
+	return func(yield func(*proto.Data) bool) {
+		for _, d := range items {
+			protoData, err := convertModelDataToProto(d)
+			if err != nil {
+				continue
+			}
+			if !yield(protoData) {
+				return
+			}
+		}
+	}
+}
+
 // SaveData сохраняет данные пользователя
 func (s *DataService) SaveData(ctx context.Context, req *proto.SaveDataRequest) (*proto.SaveDataResponse, error) {
-	userID, err := s.getUserIDFromContext(ctx)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return &proto.SaveDataResponse{
 			Success: false,
@@ -197,7 +193,7 @@ func (s *DataService) SaveData(ctx context.Context, req *proto.SaveDataRequest) 
 
 // GetData получает данные по ID
 func (s *DataService) GetData(ctx context.Context, req *proto.GetDataRequest) (*proto.GetDataResponse, error) {
-	userID, err := s.getUserIDFromContext(ctx)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return &proto.GetDataResponse{
 			Success: false,
@@ -246,7 +242,7 @@ func (s *DataService) GetData(ctx context.Context, req *proto.GetDataRequest) (*
 
 // ListData получает список данных пользователя
 func (s *DataService) ListData(ctx context.Context, req *proto.ListDataRequest) (*proto.ListDataResponse, error) {
-	userID, err := s.getUserIDFromContext(ctx)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return &proto.ListDataResponse{
 			Success: false,
@@ -270,14 +266,7 @@ func (s *DataService) ListData(ctx context.Context, req *proto.ListDataRequest) 
 		}, status.Error(codes.Internal, "internal error")
 	}
 
-	protoDataList := make([]*proto.Data, 0, len(out.Items))
-	for _, d := range out.Items {
-		protoData, err := convertModelDataToProto(d)
-		if err != nil {
-			continue
-		}
-		protoDataList = append(protoDataList, protoData)
-	}
+	protoDataList := slices.Collect(modelDataSliceToProtoSeq(out.Items))
 
 	return &proto.ListDataResponse{
 		Success: true,
@@ -288,7 +277,7 @@ func (s *DataService) ListData(ctx context.Context, req *proto.ListDataRequest) 
 
 // DeleteData удаляет данные
 func (s *DataService) DeleteData(ctx context.Context, req *proto.DeleteDataRequest) (*proto.DeleteDataResponse, error) {
-	userID, err := s.getUserIDFromContext(ctx)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return &proto.DeleteDataResponse{
 			Success: false,
@@ -321,7 +310,7 @@ func (s *DataService) DeleteData(ctx context.Context, req *proto.DeleteDataReque
 
 // SyncData синхронизирует данные
 func (s *DataService) SyncData(ctx context.Context, req *proto.SyncDataRequest) (*proto.SyncDataResponse, error) {
-	userID, err := s.getUserIDFromContext(ctx)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return &proto.SyncDataResponse{
 			Success: false,
@@ -345,14 +334,7 @@ func (s *DataService) SyncData(ctx context.Context, req *proto.SyncDataRequest) 
 		}, status.Error(codes.Internal, "internal error")
 	}
 
-	protoDataList := make([]*proto.Data, 0, len(out.Items))
-	for _, d := range out.Items {
-		protoData, err := convertModelDataToProto(d)
-		if err != nil {
-			continue
-		}
-		protoDataList = append(protoDataList, protoData)
-	}
+	protoDataList := slices.Collect(modelDataSliceToProtoSeq(out.Items))
 
 	return &proto.SyncDataResponse{
 		Success:  true,
