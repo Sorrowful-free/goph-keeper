@@ -1,18 +1,17 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gophkeeper/gophkeeper/internal/client/tui"
+	"github.com/gophkeeper/gophkeeper/internal/config"
 )
 
 var (
 	version   = "dev"
 	buildDate = "unknown"
-	server    = flag.String("server", "localhost:50051", "Server address")
 )
 
 func main() {
@@ -23,10 +22,11 @@ func main() {
 			os.Exit(0)
 		}
 	}
-	flag.Parse()
+
+	cfg := config.LoadClient()
 
 	// Создаём модель приложения
-	app, err := tui.NewAppModel(*server)
+	app, err := tui.NewAppModel(cfg.Server)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating app: %v\n", err)
 		os.Exit(1)
