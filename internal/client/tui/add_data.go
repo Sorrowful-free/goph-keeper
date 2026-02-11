@@ -4,14 +4,12 @@ import (
 	"iter"
 	"slices"
 
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/google/uuid"
+	"github.com/gophkeeper/gophkeeper/internal/client/format"
 	"github.com/gophkeeper/gophkeeper/proto"
 )
 
@@ -75,12 +73,7 @@ func NewAddDataModel(m *Model) *AddDataModel {
 	nameInput.CharLimit = 100
 	nameInput.Width = 38
 
-	types := []string{
-		"Логин/Пароль",
-		"Текст",
-		"Бинарные данные",
-		"Банковская карта",
-	}
+	types := format.DataTypeDisplayNames()
 
 	return &AddDataModel{
 		model:       m,
@@ -102,29 +95,11 @@ func NewAddDataModel(m *Model) *AddDataModel {
 }
 
 func (m *AddDataModel) dataType() proto.DataType {
-	switch m.typeSelect {
-	case 0:
-		return proto.DataType_LOGIN_PASSWORD
-	case 1:
-		return proto.DataType_TEXT
-	case 2:
-		return proto.DataType_BINARY
-	case 3:
-		return proto.DataType_BANK_CARD
-	}
-	return proto.DataType_UNKNOWN
+	return format.DataTypeFromIndex(m.typeSelect)
 }
 
 func (m *AddDataModel) fieldCount() int {
-	switch m.dataType() {
-	case proto.DataType_LOGIN_PASSWORD:
-		return 2
-	case proto.DataType_TEXT, proto.DataType_BINARY:
-		return 1
-	case proto.DataType_BANK_CARD:
-		return 4
-	}
-	return 0
+	return format.FieldCount(m.dataType())
 }
 
 func (m *AddDataModel) focusFirstField() {
@@ -232,25 +207,28 @@ func (m *AddDataModel) getFocusedInput() *textinput.Model {
 }
 
 func (m *AddDataModel) buildEncryptedData() ([]byte, error) {
-	switch m.dataType() {
+	fields := m.collectFieldValues()
+	return format.BuildPayload(m.dataType(), fields)
+}
+
+func (m *AddDataModel) collectFieldValues() map[string]string {
+	fields := make(map[string]string)
+	dt := m.dataType()
+	switch dt {
 	case proto.DataType_LOGIN_PASSWORD:
-		return json.Marshal(map[string]string{
-			"login":    m.loginInput.Value(),
-			"password": m.passwordInput.Value(),
-		})
+		fields[format.FieldLogin] = m.loginInput.Value()
+		fields[format.FieldPassword] = m.passwordInput.Value()
 	case proto.DataType_TEXT:
-		return json.Marshal(map[string]string{"text": m.textInput.Value()})
+		fields[format.FieldText] = m.textInput.Value()
 	case proto.DataType_BINARY:
-		return []byte(m.binaryInput.Value()), nil
+		fields[format.FieldBinary] = m.binaryInput.Value()
 	case proto.DataType_BANK_CARD:
-		return json.Marshal(map[string]string{
-			"number": m.cardNumber.Value(),
-			"expiry": m.cardExpiry.Value(),
-			"cvv":    m.cardCVV.Value(),
-			"holder": m.cardHolder.Value(),
-		})
+		fields[format.FieldNumber] = m.cardNumber.Value()
+		fields[format.FieldExpiry] = m.cardExpiry.Value()
+		fields[format.FieldCVV] = m.cardCVV.Value()
+		fields[format.FieldHolder] = m.cardHolder.Value()
 	}
-	return []byte{}, nil
+	return fields
 }
 
 func (m *AddDataModel) Init() tea.Cmd {
@@ -343,16 +321,7 @@ func (m *AddDataModel) handleSubmit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	data := &proto.Data{
-		Id:            uuid.New().String(),
-		Type:          m.dataType(),
-		Name:          name,
-		EncryptedData: payload,
-		CreatedAt:     time.Now().Unix(),
-		UpdatedAt:     time.Now().Unix(),
-		Version:       1,
-	}
-
+	data := format.BuildDataForSave(name, m.dataType(), payload)
 	_, _, err = m.model.client.SaveData(data)
 	if err != nil {
 		m.err = err

@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/gophkeeper/gophkeeper/internal/client/format"
 	"github.com/gophkeeper/gophkeeper/proto"
 )
 
@@ -107,7 +108,7 @@ func (m *ListDataModel) View() string {
 func listDataToLinesSeq(dataList []*proto.Data, selected int) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for i, d := range dataList {
-			item := fmt.Sprintf("%s [%s]", d.Name, getDataTypeName(d.Type))
+			item := fmt.Sprintf("%s [%s]", d.Name, format.DataTypeDisplayName(d.Type))
 			var line string
 			if i == selected {
 				line = selectedMenuItemStyle.Render("▶ " + item)
@@ -118,20 +119,5 @@ func listDataToLinesSeq(dataList []*proto.Data, selected int) iter.Seq[string] {
 				return
 			}
 		}
-	}
-}
-
-func getDataTypeName(dt proto.DataType) string {
-	switch dt {
-	case proto.DataType_LOGIN_PASSWORD:
-		return "Логин/Пароль"
-	case proto.DataType_TEXT:
-		return "Текст"
-	case proto.DataType_BINARY:
-		return "Бинарные"
-	case proto.DataType_BANK_CARD:
-		return "Банковская карта"
-	default:
-		return "Неизвестно"
 	}
 }
