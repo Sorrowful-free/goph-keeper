@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -21,13 +20,14 @@ var embedMigrations embed.FS
 
 // RunUp выполняет миграции вверх (up). Использует отдельное подключение к БД для миграций,
 // чтобы m.Close() не закрывал основное соединение GORM (иначе после миграций возникала бы ошибка "database is closed").
-func RunUp(db *gorm.DB, dsn string) error {
+// dbType: "postgres" или "sqlite".
+func RunUp(db *gorm.DB, dsn string, dbType string) error {
 	// Проверяем, что основное подключение живо (миграции его не трогают)
 	if _, err := db.DB(); err != nil {
 		return fmt.Errorf("get underlying *sql.DB: %w", err)
 	}
 
-	isPostgres := os.Getenv("DB_TYPE") == "postgres" || (len(dsn) >= 4 && dsn[:4] == "post")
+	isPostgres := dbType == "postgres"
 	var databaseURL string
 	var migrationsPath string
 

@@ -1,14 +1,14 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"log"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/gophkeeper/gophkeeper/internal/config"
+	"github.com/gophkeeper/gophkeeper/internal/crypto"
 	"github.com/gophkeeper/gophkeeper/internal/migrations"
 	"github.com/gophkeeper/gophkeeper/internal/repository"
 	"github.com/gophkeeper/gophkeeper/internal/server"
@@ -20,29 +20,23 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var (
-	port     = flag.String("port", "50051", "Server port")
-	dsn      = flag.String("dsn", "", "Database connection string (default: SQLite)")
-	grpcAddr = flag.String("addr", "", "gRPC server address (overrides port)")
-)
-
 func main() {
-	flag.Parse()
+	cfg := config.Load()
 
-	addr := *grpcAddr
-	if addr == "" {
-		addr = fmt.Sprintf(":%s", *port)
-	}
+	// Инициализация JWT из конфига
+	crypto.JWTSecret = cfg.JWTSecret
+	crypto.AccessTokenExpiry = cfg.AccessTokenExpiry
+	crypto.RefreshTokenExpiry = cfg.RefreshTokenExpiry
 
 	// Infrastructure: storage (БД)
-	st, err := storage.NewStorage(*dsn)
+	st, err := storage.NewStorage(cfg.DSN, cfg.DBType)
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 	defer st.Close()
 
 	// Миграции (go-migrate)
-	if err := migrations.RunUp(st.GetDB(), *dsn); err != nil {
+	if err := migrations.RunUp(st.GetDB(), cfg.DSN, cfg.DBType); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
@@ -66,12 +60,12 @@ func main() {
 	proto.RegisterDataServiceServer(grpcServer, dataService)
 	reflection.Register(grpcServer)
 
-	listener, err := net.Listen("tcp", addr)
+	listener, err := net.Listen("tcp", cfg.Address)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	log.Printf("Server listening on %s", addr)
+	log.Printf("Server listening on %s", cfg.Address)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)

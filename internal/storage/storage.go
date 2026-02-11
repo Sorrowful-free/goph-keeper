@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
@@ -16,7 +15,8 @@ type Storage struct {
 }
 
 // NewStorage создаёт новое хранилище (миграции не выполняются — их нужно запускать отдельно через migrations.RunUp или CLI migrate).
-func NewStorage(dsn string) (*Storage, error) {
+// dbType: "postgres" или "sqlite".
+func NewStorage(dsn string, dbType string) (*Storage, error) {
 	var db *gorm.DB
 	var err error
 
@@ -24,7 +24,7 @@ func NewStorage(dsn string) (*Storage, error) {
 		dsn = "gophkeeper.db"
 	}
 
-	if os.Getenv("DB_TYPE") == "postgres" || (len(dsn) >= 4 && dsn[:4] == "post") {
+	if dbType == "postgres" {
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
 			Logger: logger.Default.LogMode(logger.Info),
 		})
