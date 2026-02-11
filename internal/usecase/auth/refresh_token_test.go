@@ -3,13 +3,23 @@ package auth_test
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/gophkeeper/gophkeeper/internal/crypto"
 	"github.com/gophkeeper/gophkeeper/internal/domain/repository/mocks"
 	"github.com/gophkeeper/gophkeeper/internal/usecase/auth"
 	"go.uber.org/mock/gomock"
 )
+
+func TestMain(m *testing.M) {
+	// JWT параметры на сервере задаются из конфига; в тестах инициализируем один раз
+	crypto.JWTSecret = []byte("test-secret")
+	crypto.AccessTokenExpiry = 15 * time.Minute
+	crypto.RefreshTokenExpiry = 24 * time.Hour
+	os.Exit(m.Run())
+}
 
 func TestRefreshToken_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)

@@ -7,13 +7,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Глобальные параметры JWT — задаются из конфига при старте сервера (см. cmd/server/main.go).
 var (
-	// JWTSecret секретный ключ для JWT (в продакшене должен быть в переменных окружения)
-	JWTSecret = []byte("your-secret-key-change-in-production")
-	// AccessTokenExpiry время жизни access токена
-	AccessTokenExpiry = 15 * time.Minute
-	// RefreshTokenExpiry время жизни refresh токена
-	RefreshTokenExpiry = 7 * 24 * time.Hour
+	JWTSecret          []byte
+	AccessTokenExpiry  time.Duration
+	RefreshTokenExpiry time.Duration
 )
 
 // Claims представляет JWT claims
@@ -22,8 +20,18 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+func checkJWTConfig() error {
+	if len(JWTSecret) == 0 {
+		return errors.New("JWT secret not configured (set from config at server startup)")
+	}
+	return nil
+}
+
 // GenerateAccessToken генерирует access токен
 func GenerateAccessToken(userID string) (string, error) {
+	if err := checkJWTConfig(); err != nil {
+		return "", err
+	}
 	claims := &Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -38,6 +46,9 @@ func GenerateAccessToken(userID string) (string, error) {
 
 // GenerateRefreshToken генерирует refresh токен
 func GenerateRefreshToken(userID string) (string, error) {
+	if err := checkJWTConfig(); err != nil {
+		return "", err
+	}
 	claims := &Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -52,6 +63,9 @@ func GenerateRefreshToken(userID string) (string, error) {
 
 // ValidateToken валидирует JWT токен
 func ValidateToken(tokenString string) (*Claims, error) {
+	if err := checkJWTConfig(); err != nil {
+		return nil, err
+	}
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")

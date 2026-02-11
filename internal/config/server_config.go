@@ -8,16 +8,16 @@ import (
 	"time"
 )
 
-// Config — конфигурация сервера (всё, что парсится из флагов и переменных окружения).
-type Config struct {
+// ServerConfig — конфигурация сервера (всё, что парсится из флагов и переменных окружения).
+type ServerConfig struct {
 	// Server
 	Port     string // порт (флаг -port)
 	GrpcAddr string // адрес gRPC (флаг -addr, переопределяет port)
 	Address  string // итоговый адрес слушателя, например ":50051"
 
 	// Database
-	DSN     string // строка подключения к БД (флаг -dsn)
-	DBType  string // "postgres" или "sqlite"
+	DSN        string // строка подключения к БД (флаг -dsn)
+	DBType     string // "postgres" или "sqlite"
 	DefaultDSN string // DSN по умолчанию, если не задан (sqlite: gophkeeper.db)
 
 	// Security (JWT)
@@ -39,13 +39,13 @@ const (
 // Load парсит флаги и переменные окружения, заполняет и возвращает Config.
 // Флаги: -port, -dsn, -addr.
 // Env: DB_TYPE, JWT_SECRET, ACCESS_TOKEN_EXPIRY, REFRESH_TOKEN_EXPIRY.
-func Load() *Config {
+func Load() *ServerConfig {
 	port := flag.String("port", defaultPort, "Server port")
 	dsn := flag.String("dsn", "", "Database connection string (default: SQLite)")
 	grpcAddr := flag.String("addr", "", "gRPC server address (overrides port)")
 	flag.Parse()
 
-	cfg := &Config{
+	cfg := &ServerConfig{
 		Port:       *port,
 		GrpcAddr:   *grpcAddr,
 		DSN:        *dsn,
