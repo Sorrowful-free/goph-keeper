@@ -1,0 +1,32 @@
+# Пример конфигурационного файла для сервера GophKeeper
+
+server:
+  # Адрес и порт сервера
+  address: ":50051"
+  
+  # TLS настройки (опционально)
+  # tls:
+  #   cert_file: "server.crt"
+  #   key_file: "server.key"
+
+database:
+  # Тип БД: "sqlite" или "postgres"
+  type: "sqlite"
+  
+  # DSN для подключения
+  # SQLite:
+  dsn: "gophkeeper.db"
+  
+  # PostgreSQL:
+  # dsn: "host=localhost user=postgres password=postgres dbname=gophkeeper sslmode=disable port=5432"
+
+security:
+  # Секретный ключ для JWT (ОБЯЗАТЕЛЬНО измените в продакшене!)
+  jwt_secret: "your-secret-key-change-in-production"
+  
+  # Время жизни токенов
+  access_token_expiry: "15m"
+  refresh_token_expiry: "168h"  # 7 дней
+
+logging:
+  level: "info"  # debug, info, warn, error

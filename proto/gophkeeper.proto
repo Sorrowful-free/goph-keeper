@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package gophkeeper;
+
+option go_package = "github.com/gophkeeper/gophkeeper/proto";
+
+// Сервис аутентификации
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+}
+
+// Сервис для работы с данными
+service DataService {
+  rpc SaveData(SaveDataRequest) returns (SaveDataResponse);
+  rpc GetData(GetDataRequest) returns (GetDataResponse);
+  rpc ListData(ListDataRequest) returns (ListDataResponse);
+  rpc DeleteData(DeleteDataRequest) returns (DeleteDataResponse);
+  rpc SyncData(SyncDataRequest) returns (SyncDataResponse);
+}
+
+// Запрос регистрации
+message RegisterRequest {
+  string login = 1;
+  string password = 2;
+}
+
+// Ответ регистрации
+message RegisterResponse {
+  bool success = 1;
+  string message = 2;
+  string user_id = 3;
+}
+
+// Запрос входа
+message LoginRequest {
+  string login = 1;
+  string password = 2;
+}
+
+// Ответ входа
+message LoginResponse {
+  bool success = 1;
+  string message = 2;
+  string access_token = 3;
+  string refresh_token = 4;
+  int64 expires_in = 5;
+}
+
+// Запрос обновления токена
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// Ответ обновления токена
+message RefreshTokenResponse {
+  bool success = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  int64 expires_in = 4;
+}
+
+// Тип данных
+enum DataType {
+  UNKNOWN = 0;
+  LOGIN_PASSWORD = 1;
+  TEXT = 2;
+  BINARY = 3;
+  BANK_CARD = 4;
+}
+
+// Метаданные
+message Metadata {
+  string key = 1;
+  string value = 2;
+}
+
+// Данные для сохранения
+message Data {
+  string id = 1;
+  DataType type = 2;
+  string name = 3;
+  bytes encrypted_data = 4;
+  repeated Metadata metadata = 5;
+  int64 created_at = 6;
+  int64 updated_at = 7;
+  int64 version = 8;
+}
+
+// Запрос сохранения данных
+message SaveDataRequest {
+  Data data = 1;
+}
+
+// Ответ сохранения данных
+message SaveDataResponse {
+  bool success = 1;
+  string message = 2;
+  string data_id = 3;
+  int64 version = 4;
+}
+
+// Запрос получения данных
+message GetDataRequest {
+  string data_id = 1;
+}
+
+// Ответ получения данных
+message GetDataResponse {
+  bool success = 1;
+  string message = 2;
+  Data data = 3;
+}
+
+// Запрос списка данных
+message ListDataRequest {
+  DataType type = 1; // 0 = все типы
+}
+
+// Ответ списка данных
+message ListDataResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Data data = 3;
+}
+
+// Запрос удаления данных
+message DeleteDataRequest {
+  string data_id = 1;
+}
+
+// Ответ удаления данных
+message DeleteDataResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Запрос синхронизации
+message SyncDataRequest {
+  int64 last_sync_time = 1;
+}
+
+// Ответ синхронизации
+message SyncDataResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Data data = 3;
+  int64 sync_time = 4;
+}
